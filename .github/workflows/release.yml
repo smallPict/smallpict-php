@@ -19,4 +19,4 @@ jobs:
           curl -s -XPOST \
             -H'Content-Type:application/json' \
             "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_TOKEN}" \
-            -d'{"repository":{"url":"https://github.com/tuxnoob/smallpict-php"}}'
+            -d'{"repository":{"url":"https://github.com/smallPict/smallpict-php"}}'
