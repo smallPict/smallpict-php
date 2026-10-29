@@ -17,6 +17,8 @@ class JobStatusResult
     private ?array $error;
     private ?string $createdAt;
     private ?string $updatedAt;
+    private ?string $modeApplied;
+    private ?int $qualityApplied;
 
     /**
      * @param string $jobId
@@ -27,6 +29,8 @@ class JobStatusResult
      * @param array<string, mixed>|null $error
      * @param string|null $createdAt
      * @param string|null $updatedAt
+     * @param string|null $modeApplied
+     * @param int|null $qualityApplied
      */
     public function __construct(
         string $jobId,
@@ -36,7 +40,9 @@ class JobStatusResult
         ?int $bytesSaved = null,
         ?array $error = null,
         ?string $createdAt = null,
-        ?string $updatedAt = null
+        ?string $updatedAt = null,
+        ?string $modeApplied = null,
+        ?int $qualityApplied = null
     ) {
         $this->jobId = $jobId;
         $this->status = $status;
@@ -46,6 +52,8 @@ class JobStatusResult
         $this->error = $error;
         $this->createdAt = $createdAt;
         $this->updatedAt = $updatedAt;
+        $this->modeApplied = $modeApplied;
+        $this->qualityApplied = $qualityApplied;
     }
 
     public function getJobId(): string
@@ -89,5 +97,21 @@ class JobStatusResult
     public function getUpdatedAt(): ?string
     {
         return $this->updatedAt;
+    }
+
+    /**
+     * Mode the server applied; null for jobs created before modes existed.
+     */
+    public function getModeApplied(): ?string
+    {
+        return $this->modeApplied;
+    }
+
+    /**
+     * Quality the server applied; null for jobs created before modes existed.
+     */
+    public function getQualityApplied(): ?int
+    {
+        return $this->qualityApplied;
     }
 }

@@ -59,6 +59,15 @@ $result = $client->optimize(
 
 echo "Optimized CDN URL: " . $result->getUrl() . "\n";
 echo "Saved: " . $result->getSavingsPercentage() . "% (" . $result->getBytesSaved() . " bytes)\n";
+
+// Compression mode: CompressionMode::LOSSY (default), EXTREME or LOSSLESS.
+// The server checks it against your plan and answers 403 mode_not_in_plan
+// (PermissionDeniedException, allowed modes in getDetails()['allowed_modes']).
+// The old 'lossless' => true option is deprecated; use 'mode' instead.
+$result = $client->optimize($imageContent, [
+    'format' => ImageFormat::WEBP,
+    'mode'   => \SmallPict\Models\CompressionMode::LOSSLESS,
+]);
 ```
 
 ### 2. Laravel Integration (Laravel 10 / 11)

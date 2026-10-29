@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SmallPict\Models;
 
+use SmallPict\Exceptions\ValidationException;
+
 class OptimizeOptions
 {
     private string $format;
@@ -13,11 +15,17 @@ class OptimizeOptions
     private ?int $maxDimension;
     private string $fit;
     private bool $lossless;
+    private ?string $mode;
     private bool $stripMetadata;
     private ?string $filename;
     private ?string $mimeType;
     private ?string $idempotencyKey;
 
+    /**
+     * @param bool $lossless Deprecated: use $mode = CompressionMode::LOSSLESS. Removed not before the next major version.
+     * @param string|null $mode One of the CompressionMode constants; null lets the server apply its default (lossy).
+     * @throws ValidationException when $mode is unknown or contradicts $lossless = true
+     */
     public function __construct(
         string $format = ImageFormat::AUTO,
         int $quality = 80,
@@ -29,8 +37,28 @@ class OptimizeOptions
         ?string $filename = null,
         ?string $mimeType = null,
         ?string $idempotencyKey = null,
-        ?int $maxDimension = null
+        ?int $maxDimension = null,
+        ?string $mode = null
     ) {
+        if ($mode !== null && !in_array($mode, CompressionMode::ALL, true)) {
+            throw new ValidationException(
+                sprintf('Invalid mode "%s"; expected one of: %s', $mode, implode(', ', CompressionMode::ALL)),
+                null,
+                ['mode' => $mode]
+            );
+        }
+        if ($lossless) {
+            trigger_error('OptimizeOptions lossless is deprecated; use mode CompressionMode::LOSSLESS instead.', E_USER_DEPRECATED);
+            if ($mode !== null && $mode !== CompressionMode::LOSSLESS) {
+                throw new ValidationException(
+                    sprintf('lossless = true contradicts mode "%s"; set only mode', $mode),
+                    null,
+                    ['mode' => $mode]
+                );
+            }
+            $mode = CompressionMode::LOSSLESS;
+        }
+
         $this->format = $format;
         $this->quality = max(1, min(100, $quality));
         $this->maxWidth = $maxWidth;
@@ -38,6 +66,7 @@ class OptimizeOptions
         $this->maxDimension = $maxDimension;
         $this->fit = $fit;
         $this->lossless = $lossless;
+        $this->mode = $mode;
         $this->stripMetadata = $stripMetadata;
         $this->filename = $filename;
         $this->mimeType = $mimeType;
@@ -74,9 +103,20 @@ class OptimizeOptions
         return $this->fit;
     }
 
+    /**
+     * @deprecated Use getMode() === CompressionMode::LOSSLESS. Removed not before the next major version.
+     */
     public function isLossless(): bool
     {
         return $this->lossless;
+    }
+
+    /**
+     * Mode sent on the wire, after mapping the deprecated lossless flag; null when none was set.
+     */
+    public function getMode(): ?string
+    {
+        return $this->mode;
     }
 
     public function shouldStripMetadata(): bool
@@ -109,16 +149,21 @@ class OptimizeOptions
      */
     public function toArray(): array
     {
-        return [
+        $data = [
             'format' => $this->format,
             'quality' => $this->quality,
             'max_width' => $this->maxWidth,
             'max_height' => $this->maxHeight,
             'max_dimension' => $this->maxDimension,
             'fit' => $this->fit,
-            'lossless' => $this->lossless,
             'strip_metadata' => $this->stripMetadata,
         ];
+        // The deprecated lossless key never goes on the wire; it is mapped to mode in the constructor.
+        if ($this->mode !== null) {
+            $data['mode'] = $this->mode;
+        }
+
+        return $data;
     }
 
     /**
@@ -137,7 +182,8 @@ class OptimizeOptions
             isset($options['filename']) ? (string)$options['filename'] : null,
             isset($options['mime_type']) ? (string)$options['mime_type'] : (isset($options['mimeType']) ? (string)$options['mimeType'] : null),
             isset($options['idempotency_key']) ? (string)$options['idempotency_key'] : (isset($options['idempotencyKey']) ? (string)$options['idempotencyKey'] : null),
-            isset($options['max_dimension']) ? (int)$options['max_dimension'] : (isset($options['maxDimension']) ? (int)$options['maxDimension'] : null)
+            isset($options['max_dimension']) ? (int)$options['max_dimension'] : (isset($options['maxDimension']) ? (int)$options['maxDimension'] : null),
+            isset($options['mode']) ? (string)$options['mode'] : null
         );
     }
 }

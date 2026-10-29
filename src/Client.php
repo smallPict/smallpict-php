@@ -196,7 +196,9 @@ class Client
             isset($res['bytes_saved']) ? (int)$res['bytes_saved'] : null,
             isset($res['error']) && is_array($res['error']) ? $res['error'] : null,
             $res['created_at'] ?? null,
-            $res['updated_at'] ?? null
+            $res['updated_at'] ?? null,
+            isset($res['mode_applied']) ? (string)$res['mode_applied'] : null,
+            isset($res['quality_applied']) ? (int)$res['quality_applied'] : null
         );
     }
 
