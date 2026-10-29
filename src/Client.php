@@ -91,7 +91,9 @@ class Client
                 $compressedSize,
                 $bytesSaved,
                 $savingsPercentage,
-                $res['upload_url'] ?? null
+                $res['upload_url'] ?? null,
+                null,
+                isset($res['folder']) ? (string)$res['folder'] : null
             );
         } catch (QuotaExceededException $e) {
             if ($this->config->getFallbackMode() === FallbackMode::PASSTHROUGH) {
@@ -142,17 +144,29 @@ class Client
      * Invalidate cached assets across global CDN edge locations.
      *
      * @param array<string>|string $urls Single URL or array of URLs to purge
-     * @param string $purgeType PurgeType::URL or PurgeType::ALL
+     * @param string $purgeType PurgeType::URL, PurgeType::FOLDER or PurgeType::ALL
+     * @param string|null $folder Upload folder to purge; required for PurgeType::FOLDER, ignored otherwise
      * @return PurgeResponse
-     * @throws SmallPictException
+     * @throws SmallPictException 429 purge_rate_limited (hourly folder/all limit) raises RateLimitException without retry
      */
-    public function purgeCdn($urls = [], string $purgeType = PurgeType::URL): PurgeResponse
+    public function purgeCdn($urls = [], string $purgeType = PurgeType::URL, ?string $folder = null): PurgeResponse
     {
-        $urlList = is_string($urls) ? [$urls] : (array)$urls;
-        $payload = [
-            'purge_type' => $purgeType,
-            'urls' => $urlList,
-        ];
+        if ($purgeType === PurgeType::FOLDER) {
+            if ($folder === null) {
+                throw new ValidationException('folder is required for purge type "folder"');
+            }
+            OptimizeOptions::validateFolder($folder);
+            $payload = [
+                'purge_type' => $purgeType,
+                'folder' => $folder,
+            ];
+        } else {
+            $urlList = is_string($urls) ? [$urls] : (array)$urls;
+            $payload = [
+                'purge_type' => $purgeType,
+                'urls' => $urlList,
+            ];
+        }
 
         $res = $this->request('POST', '/v1/purge', $payload);
         return new PurgeResponse((string)($res['message'] ?? 'Purge job accepted'));
@@ -198,7 +212,8 @@ class Client
             $res['created_at'] ?? null,
             $res['updated_at'] ?? null,
             isset($res['mode_applied']) ? (string)$res['mode_applied'] : null,
-            isset($res['quality_applied']) ? (int)$res['quality_applied'] : null
+            isset($res['quality_applied']) ? (int)$res['quality_applied'] : null,
+            isset($res['folder']) ? (string)$res['folder'] : null
         );
     }
 
@@ -275,9 +290,12 @@ class Client
             $requestId = $respHeaders['x-request-id'] ?? null;
             $retryAfterHeader = $respHeaders['retry-after'] ?? null;
 
-            // Retry on 429 and transient 5xx
+            $decoded = json_decode($resp['body'], true);
+            $parsedBody = is_array($decoded) ? $decoded : ['raw' => $resp['body']];
+
+            // Retry on 429 and transient 5xx; purge_rate_limited is an hourly limit, so retrying in seconds cannot help.
             if ($status === 429 || ($status >= 500 && $status <= 504)) {
-                if ($attempt <= $maxRetries) {
+                if ($attempt <= $maxRetries && self::errorCode($parsedBody) !== 'purge_rate_limited') {
                     $delayUs = (int)($baseDelayUs * (2 ** ($attempt - 1)));
                     if ($retryAfterHeader !== null && is_numeric($retryAfterHeader)) {
                         $delayUs = (int)((float)$retryAfterHeader * 1000000);
@@ -287,9 +305,6 @@ class Client
                     continue;
                 }
             }
-
-            $decoded = json_decode($resp['body'], true);
-            $parsedBody = is_array($decoded) ? $decoded : ['raw' => $resp['body']];
 
             if ($status < 200 || $status >= 300) {
                 $this->throwExceptionForStatus($status, $parsedBody, $requestId, $retryAfterHeader);
@@ -390,6 +405,14 @@ class Client
             'filesize' => $filesize,
             'bytes' => $bytes,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private static function errorCode(array $body): ?string
+    {
+        return isset($body['error']['code']) && is_string($body['error']['code']) ? $body['error']['code'] : null;
     }
 
     private static function generateUuid(): string

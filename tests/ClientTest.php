@@ -8,12 +8,14 @@ use PHPUnit\Framework\TestCase;
 use SmallPict\Client;
 use SmallPict\Config;
 use SmallPict\Exceptions\PermissionDeniedException;
+use SmallPict\Exceptions\RateLimitException;
 use SmallPict\Exceptions\ValidationException;
 use SmallPict\Http\HttpClientInterface;
 use SmallPict\Models\CompressionMode;
 use SmallPict\Models\FallbackMode;
 use SmallPict\Models\ImageFormat;
 use SmallPict\Models\OptimizeOptions;
+use SmallPict\Models\PurgeType;
 
 class ClientTest extends TestCase
 {
@@ -358,5 +360,181 @@ class ClientTest extends TestCase
             $this->assertSame('extreme', $e->getDetails()['mode']);
             $this->assertSame(['lossy'], $e->getDetails()['allowed_modes']);
         }
+    }
+
+    /**
+     * Mock HTTP client that records every request and answers with a fixed response.
+     *
+     * @param array<string, mixed> $responseBody
+     */
+    private function recordingHttp(int $status, array $responseBody): HttpClientInterface
+    {
+        return new class ($status, $responseBody) implements HttpClientInterface {
+            /** @var array<int, array{method: string, url: string, body: array<string, mixed>|null}> */
+            public array $requests = [];
+            private int $status;
+            /** @var array<string, mixed> */
+            private array $responseBody;
+
+            /** @param array<string, mixed> $responseBody */
+            public function __construct(int $status, array $responseBody)
+            {
+                $this->status = $status;
+                $this->responseBody = $responseBody;
+            }
+
+            public function send(string $method, string $url, array $headers = [], ?string $body = null, float $timeout = 30.0): array
+            {
+                $this->requests[] = ['method' => $method, 'url' => $url, 'body' => $body !== null ? json_decode($body, true) : null];
+                return ['status' => $this->status, 'headers' => [], 'body' => (string)json_encode($this->responseBody)];
+            }
+        };
+    }
+
+    public function testOptimizeSendsFolderAndSurfacesIt(): void
+    {
+        $http = $this->recordingHttp(200, ['job_id' => 'job_f', 'status' => 'completed', 'url' => 'https://cdn.smallpict.app/c/f/blog/2026/job_f.avif', 'folder' => 'blog/2026']);
+        $client = new Client('sp_sdk_test', null, $http);
+
+        $result = $client->optimize('raw binary test data', ['folder' => 'Blog/2026']);
+
+        $this->assertSame('Blog/2026', $http->requests[0]['body']['options']['folder']);
+        $this->assertSame('blog/2026', $result->getFolder());
+    }
+
+    public function testOptimizeOmitsFolderWhenUnset(): void
+    {
+        $http = $this->recordingHttp(200, ['job_id' => 'job_n', 'status' => 'completed']);
+        $client = new Client('sp_sdk_test', null, $http);
+
+        $result = $client->optimize('raw binary test data', new OptimizeOptions());
+
+        $this->assertArrayNotHasKey('folder', $http->requests[0]['body']['options']);
+        $this->assertNull($result->getFolder());
+    }
+
+    public function testJobStatusParsesFolder(): void
+    {
+        $client = new Client('sp_sdk_test', null, $this->recordingHttp(200, ['job_id' => 'job_f', 'status' => 'completed', 'folder' => 'products/shoes']));
+        $this->assertSame('products/shoes', $client->getJobStatus('job_f')->getFolder());
+
+        $client = new Client('sp_sdk_test', null, $this->recordingHttp(200, ['job_id' => 'job_n', 'status' => 'completed']));
+        $this->assertNull($client->getJobStatus('job_n')->getFolder());
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function invalidFolderProvider(): array
+    {
+        return [
+            'empty segment' => ['a//b'],
+            'leading slash' => ['/a'],
+            'trailing slash' => ['a/'],
+            'leading dotdot' => ['../x'],
+            'inner dotdot' => ['a/../b'],
+            'four segments' => ['a/b/c/d'],
+            'empty' => [''],
+        ];
+    }
+
+    /**
+     * @dataProvider invalidFolderProvider
+     */
+    public function testInvalidFolderRejectedBeforeHttp(string $folder): void
+    {
+        $http = $this->recordingHttp(200, []);
+        $client = new Client('sp_sdk_test', null, $http);
+
+        foreach ([
+            function () use ($client, $folder) { $client->optimize('raw binary test data', ['folder' => $folder]); },
+            function () use ($client, $folder) { $client->purgeCdn([], PurgeType::FOLDER, $folder); },
+        ] as $call) {
+            try {
+                $call();
+                $this->fail('expected ValidationException for folder "' . $folder . '"');
+            } catch (ValidationException $e) {
+                $this->assertSame($folder, $e->getDetails()['folder']);
+            }
+        }
+        $this->assertCount(0, $http->requests);
+    }
+
+    public function testPurgeFolderBodyShape(): void
+    {
+        $http = $this->recordingHttp(202, ['message' => 'Purge job enqueued successfully']);
+        $client = new Client('sp_sdk_test', null, $http);
+
+        $res = $client->purgeCdn([], PurgeType::FOLDER, 'products/shoes');
+
+        $this->assertSame('Purge job enqueued successfully', $res->getMessage());
+        $this->assertSame(['purge_type' => 'folder', 'folder' => 'products/shoes'], $http->requests[0]['body']);
+    }
+
+    public function testPurgeUrlAndAllBodiesUnchanged(): void
+    {
+        $http = $this->recordingHttp(202, ['message' => 'ok']);
+        $client = new Client('sp_sdk_test', null, $http);
+
+        $client->purgeCdn('https://cdn.smallpict.app/c/x.avif', PurgeType::URL, 'ignored');
+        $client->purgeCdn([], PurgeType::ALL);
+
+        $this->assertSame(['purge_type' => 'url', 'urls' => ['https://cdn.smallpict.app/c/x.avif']], $http->requests[0]['body']);
+        $this->assertSame(['purge_type' => 'all', 'urls' => []], $http->requests[1]['body']);
+    }
+
+    public function testPurgeFolderWithoutFolderRejectedBeforeHttp(): void
+    {
+        $http = $this->recordingHttp(202, []);
+        $client = new Client('sp_sdk_test', null, $http);
+
+        try {
+            $client->purgeCdn([], PurgeType::FOLDER);
+            $this->fail('expected ValidationException');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('folder', $e->getMessage());
+        }
+        $this->assertCount(0, $http->requests);
+    }
+
+    public function testServerInvalidFolderRaisesValidationWithServerMessage(): void
+    {
+        $http = $this->recordingHttp(400, ['error' => ['code' => 'invalid_folder', 'message' => 'folder segment "a b" contains invalid characters']]);
+        $client = new Client('sp_sdk_test', null, $http);
+
+        try {
+            $client->optimize('raw binary test data', ['folder' => 'a b']);
+            $this->fail('expected ValidationException');
+        } catch (ValidationException $e) {
+            $this->assertSame('folder segment "a b" contains invalid characters', $e->getMessage());
+        }
+    }
+
+    public function testPurgeRateLimitedIsNotRetried(): void
+    {
+        $http = $this->recordingHttp(429, ['error' => ['code' => 'purge_rate_limited', 'message' => 'Folder purge limit reached (10 per hour)']]);
+        $client = new Client(new Config('sp_sdk_test', null, null, 30.0, 3), null, $http);
+
+        try {
+            $client->purgeCdn([], PurgeType::FOLDER, 'blog');
+            $this->fail('expected RateLimitException');
+        } catch (RateLimitException $e) {
+            $this->assertSame('Folder purge limit reached (10 per hour)', $e->getMessage());
+        }
+        $this->assertCount(1, $http->requests);
+    }
+
+    public function testOtherRateLimitIsStillRetried(): void
+    {
+        $http = $this->recordingHttp(429, ['error' => ['code' => 'RATE_LIMIT_EXCEEDED', 'message' => 'Too many requests']]);
+        $client = new Client(new Config('sp_sdk_test', null, null, 30.0, 1), null, $http);
+
+        try {
+            $client->purgeCdn([], PurgeType::FOLDER, 'blog');
+            $this->fail('expected RateLimitException');
+        } catch (RateLimitException $e) {
+            $this->assertSame('Too many requests', $e->getMessage());
+        }
+        $this->assertCount(2, $http->requests);
     }
 }

@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Compression `mode` option on `optimize()` (FND-07): `OptimizeOptions` constructor argument `$mode` (last position) or array key `mode`, with the values in `SmallPict\Models\CompressionMode` (`LOSSY`, `EXTREME`, `LOSSLESS`). When no mode is set the key is omitted and the server applies `lossy`. An unknown mode throws `ValidationException` before any HTTP call. The server checks the mode against the plan: `403 mode_not_in_plan` raises `PermissionDeniedException` with `getDetails()['mode']` and `getDetails()['allowed_modes']`.
 - `JobStatusResult::getModeApplied()` and `getQualityApplied()`, read from the job status response; `null` for jobs created before modes existed.
+- **Upload folder on `optimize()` (FLD-03).** `OptimizeOptions` constructor argument `$folder` (last position) or array key `folder`, sent as `options.folder` and omitted when unset. The folder the server stored (lower case) comes back in `OptimizeResult::getFolder()` and `JobStatusResult::getFolder()`, `null` without one.
+- **Folder purge (FLD-03).** `purgeCdn([], PurgeType::FOLDER, 'blog/2026')` purges every file uploaded into that folder; the request carries `purge_type` and `folder` only. `PurgeType::URL` and `PurgeType::ALL` requests are unchanged. A missing folder for `PurgeType::FOLDER` throws `ValidationException` before any HTTP call.
+- **Light folder check on the client.** Empty segments (`a//b`, leading or trailing `/`), `..` segments and more than 3 segments throw `ValidationException` (`getDetails()['folder']`) before any HTTP call. The server stays the authority: its `400 invalid_folder` raises `ValidationException` with the server's message.
+
+### Changed
+- A `429` with error code `purge_rate_limited` (hourly limit of folder and all purges) raises `RateLimitException` at once and is no longer retried; other `429` responses keep the retry with backoff.
 
 ### Deprecated
 - The `lossless` option and `OptimizeOptions::isLossless()`. Use `mode` = `CompressionMode::LOSSLESS` instead. Setting `lossless = true` raises an `E_USER_DEPRECATED` notice and is sent as `mode: "lossless"`; combined with a different explicit `mode` it throws `ValidationException`. Removal not before the next major version.

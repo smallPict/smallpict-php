@@ -19,6 +19,7 @@ class JobStatusResult
     private ?string $updatedAt;
     private ?string $modeApplied;
     private ?int $qualityApplied;
+    private ?string $folder;
 
     /**
      * @param string $jobId
@@ -31,6 +32,7 @@ class JobStatusResult
      * @param string|null $updatedAt
      * @param string|null $modeApplied
      * @param int|null $qualityApplied
+     * @param string|null $folder
      */
     public function __construct(
         string $jobId,
@@ -42,7 +44,8 @@ class JobStatusResult
         ?string $createdAt = null,
         ?string $updatedAt = null,
         ?string $modeApplied = null,
-        ?int $qualityApplied = null
+        ?int $qualityApplied = null,
+        ?string $folder = null
     ) {
         $this->jobId = $jobId;
         $this->status = $status;
@@ -54,6 +57,7 @@ class JobStatusResult
         $this->updatedAt = $updatedAt;
         $this->modeApplied = $modeApplied;
         $this->qualityApplied = $qualityApplied;
+        $this->folder = $folder;
     }
 
     public function getJobId(): string
@@ -113,5 +117,13 @@ class JobStatusResult
     public function getQualityApplied(): ?int
     {
         return $this->qualityApplied;
+    }
+
+    /**
+     * Folder stored with the job as the server returned it (lower case); null for jobs without one.
+     */
+    public function getFolder(): ?string
+    {
+        return $this->folder;
     }
 }

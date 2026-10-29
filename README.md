@@ -68,6 +68,11 @@ $result = $client->optimize($imageContent, [
     'format' => ImageFormat::WEBP,
     'mode'   => \SmallPict\Models\CompressionMode::LOSSLESS,
 ]);
+
+// Optional upload folder (1-3 segments, e.g. "blog/2026"), sent as options.folder.
+// The server lower-cases it; read it back with $result->getFolder() or getJobStatus()->getFolder().
+// A malformed folder throws ValidationException (server code 400 invalid_folder).
+$result = $client->optimize($imageContent, ['folder' => 'blog/2026']);
 ```
 
 ### 2. Laravel Integration (Laravel 10 / 11)
@@ -148,6 +153,11 @@ echo "Plan: {$quota->getPlan()}, Quota used: {$quota->getQuotaPercentage()}%\n";
 // 2. Invalidate CDN cache
 $client->purgeCdn(['https://cdn.smallpict.app/opt/hero-banner.avif']);
 echo "CDN cache invalidated successfully.\n";
+
+// 3. Purge every file uploaded into one folder (or PurgeType::ALL for all your files).
+// Folder and all purges are limited per hour (10 and 2); one more throws
+// RateLimitException (purge_rate_limited), which the SDK does not retry.
+$client->purgeCdn([], \SmallPict\Models\PurgeType::FOLDER, 'blog/2026');
 ```
 
 ---

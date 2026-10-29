@@ -16,6 +16,7 @@ class OptimizeResult
     private float $savingsPercentage;
     private ?string $uploadUrl;
     private ?string $data;
+    private ?string $folder;
 
     public function __construct(
         string $jobId,
@@ -27,7 +28,8 @@ class OptimizeResult
         int $bytesSaved,
         float $savingsPercentage,
         ?string $uploadUrl = null,
-        ?string $data = null
+        ?string $data = null,
+        ?string $folder = null
     ) {
         $this->jobId = $jobId;
         $this->status = $status;
@@ -39,6 +41,7 @@ class OptimizeResult
         $this->savingsPercentage = $savingsPercentage;
         $this->uploadUrl = $uploadUrl;
         $this->data = $data;
+        $this->folder = $folder;
     }
 
     public function getJobId(): string
@@ -89,5 +92,13 @@ class OptimizeResult
     public function getData(): ?string
     {
         return $this->data;
+    }
+
+    /**
+     * Folder stored with the job as the server returned it (lower case); null without one.
+     */
+    public function getFolder(): ?string
+    {
+        return $this->folder;
     }
 }

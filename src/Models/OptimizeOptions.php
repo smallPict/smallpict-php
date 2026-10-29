@@ -20,11 +20,13 @@ class OptimizeOptions
     private ?string $filename;
     private ?string $mimeType;
     private ?string $idempotencyKey;
+    private ?string $folder;
 
     /**
      * @param bool $lossless Deprecated: use $mode = CompressionMode::LOSSLESS. Removed not before the next major version.
      * @param string|null $mode One of the CompressionMode constants; null lets the server apply its default (lossy).
-     * @throws ValidationException when $mode is unknown or contradicts $lossless = true
+     * @param string|null $folder Upload folder, e.g. "blog/2026"; the server normalizes it to lower case.
+     * @throws ValidationException when $mode is unknown or contradicts $lossless = true, or $folder is malformed
      */
     public function __construct(
         string $format = ImageFormat::AUTO,
@@ -38,8 +40,12 @@ class OptimizeOptions
         ?string $mimeType = null,
         ?string $idempotencyKey = null,
         ?int $maxDimension = null,
-        ?string $mode = null
+        ?string $mode = null,
+        ?string $folder = null
     ) {
+        if ($folder !== null) {
+            self::validateFolder($folder);
+        }
         if ($mode !== null && !in_array($mode, CompressionMode::ALL, true)) {
             throw new ValidationException(
                 sprintf('Invalid mode "%s"; expected one of: %s', $mode, implode(', ', CompressionMode::ALL)),
@@ -71,6 +77,7 @@ class OptimizeOptions
         $this->filename = $filename;
         $this->mimeType = $mimeType;
         $this->idempotencyKey = $idempotencyKey;
+        $this->folder = $folder;
     }
 
     public function getFormat(): string
@@ -144,6 +151,29 @@ class OptimizeOptions
         return $this->idempotencyKey;
     }
 
+    public function getFolder(): ?string
+    {
+        return $this->folder;
+    }
+
+    /**
+     * Light client-side check of an upload folder; the server applies the full rule (400 invalid_folder).
+     *
+     * @internal
+     * @throws ValidationException on empty segments, ".." segments or more than 3 segments
+     */
+    public static function validateFolder(string $folder): void
+    {
+        $segments = explode('/', $folder);
+        if (count($segments) > 3 || in_array('', $segments, true) || in_array('..', $segments, true)) {
+            throw new ValidationException(
+                sprintf('Invalid folder "%s"; expected 1-3 non-empty segments separated by "/", without ".."', $folder),
+                null,
+                ['folder' => $folder]
+            );
+        }
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -161,6 +191,9 @@ class OptimizeOptions
         // The deprecated lossless key never goes on the wire; it is mapped to mode in the constructor.
         if ($this->mode !== null) {
             $data['mode'] = $this->mode;
+        }
+        if ($this->folder !== null) {
+            $data['folder'] = $this->folder;
         }
 
         return $data;
@@ -183,7 +216,8 @@ class OptimizeOptions
             isset($options['mime_type']) ? (string)$options['mime_type'] : (isset($options['mimeType']) ? (string)$options['mimeType'] : null),
             isset($options['idempotency_key']) ? (string)$options['idempotency_key'] : (isset($options['idempotencyKey']) ? (string)$options['idempotencyKey'] : null),
             isset($options['max_dimension']) ? (int)$options['max_dimension'] : (isset($options['maxDimension']) ? (int)$options['maxDimension'] : null),
-            isset($options['mode']) ? (string)$options['mode'] : null
+            isset($options['mode']) ? (string)$options['mode'] : null,
+            isset($options['folder']) ? (string)$options['folder'] : null
         );
     }
 }
