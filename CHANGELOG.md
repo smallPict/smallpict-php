@@ -15,12 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Light folder check on the client.** Empty segments (`a//b`, leading or trailing `/`), `..` segments and more than 3 segments throw `ValidationException` (`getDetails()['folder']`) before any HTTP call. The server stays the authority: its `400 invalid_folder` raises `ValidationException` with the server's message.
 
 ### Changed
+- `OptimizeOptions` quality is now `?int` and defaults to `null` (constructor `$quality`, array key `quality`, `getQuality()`). When unset, `quality` is no longer sent, so the server picks the default for the mode: `lossy` stays at 80, `extreme` now gets its per-codec default instead of 80. A quality you set is still clamped to 1-100 and sent. Possibly breaking: `getQuality()` returns `null` instead of `80` when no quality was set.
+- README: example of `mode` `CompressionMode::EXTREME` without a quality.
 - A `429` with error code `purge_rate_limited` (hourly limit of folder and all purges) raises `RateLimitException` at once and is no longer retried; other `429` responses keep the retry with backoff.
 
 ### Deprecated
 - The `lossless` option and `OptimizeOptions::isLossless()`. Use `mode` = `CompressionMode::LOSSLESS` instead. Setting `lossless = true` raises an `E_USER_DEPRECATED` notice and is sent as `mode: "lossless"`; combined with a different explicit `mode` it throws `ValidationException`. Removal not before the next major version.
 
 ### Fixed
+- `mode` `extreme` without a quality used to send quality 80 and produce lossy-sized files; quality is now omitted when unset (CMP-04).
 - `lossless = true` used to be ignored by the server; it is now honoured, because the SDK sends it as `mode: "lossless"` and no longer sends the `lossless` key.
 
 ## [1.0.0] - 2026-08-22

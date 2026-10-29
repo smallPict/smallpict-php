@@ -9,7 +9,7 @@ use SmallPict\Exceptions\ValidationException;
 class OptimizeOptions
 {
     private string $format;
-    private int $quality;
+    private ?int $quality;
     private ?int $maxWidth;
     private ?int $maxHeight;
     private ?int $maxDimension;
@@ -23,6 +23,7 @@ class OptimizeOptions
     private ?string $folder;
 
     /**
+     * @param int|null $quality 1-100, clamped; null (default) omits it so the server picks the default for the mode and output format.
      * @param bool $lossless Deprecated: use $mode = CompressionMode::LOSSLESS. Removed not before the next major version.
      * @param string|null $mode One of the CompressionMode constants; null lets the server apply its default (lossy).
      * @param string|null $folder Upload folder, e.g. "blog/2026"; the server normalizes it to lower case.
@@ -30,7 +31,7 @@ class OptimizeOptions
      */
     public function __construct(
         string $format = ImageFormat::AUTO,
-        int $quality = 80,
+        ?int $quality = null,
         ?int $maxWidth = null,
         ?int $maxHeight = null,
         string $fit = FitMode::COVER,
@@ -66,7 +67,7 @@ class OptimizeOptions
         }
 
         $this->format = $format;
-        $this->quality = max(1, min(100, $quality));
+        $this->quality = $quality === null ? null : max(1, min(100, $quality));
         $this->maxWidth = $maxWidth;
         $this->maxHeight = $maxHeight;
         $this->maxDimension = $maxDimension;
@@ -85,7 +86,10 @@ class OptimizeOptions
         return $this->format;
     }
 
-    public function getQuality(): int
+    /**
+     * Quality sent on the wire; null when unset (the server picks the default per mode).
+     */
+    public function getQuality(): ?int
     {
         return $this->quality;
     }
@@ -181,13 +185,15 @@ class OptimizeOptions
     {
         $data = [
             'format' => $this->format,
-            'quality' => $this->quality,
             'max_width' => $this->maxWidth,
             'max_height' => $this->maxHeight,
             'max_dimension' => $this->maxDimension,
             'fit' => $this->fit,
             'strip_metadata' => $this->stripMetadata,
         ];
+        if ($this->quality !== null) {
+            $data['quality'] = $this->quality;
+        }
         // The deprecated lossless key never goes on the wire; it is mapped to mode in the constructor.
         if ($this->mode !== null) {
             $data['mode'] = $this->mode;
@@ -206,7 +212,7 @@ class OptimizeOptions
     {
         return new self(
             (string)($options['format'] ?? ImageFormat::AUTO),
-            isset($options['quality']) ? (int)$options['quality'] : 80,
+            isset($options['quality']) ? (int)$options['quality'] : null,
             isset($options['max_width']) ? (int)$options['max_width'] : (isset($options['maxWidth']) ? (int)$options['maxWidth'] : null),
             isset($options['max_height']) ? (int)$options['max_height'] : (isset($options['maxHeight']) ? (int)$options['maxHeight'] : null),
             (string)($options['fit'] ?? FitMode::COVER),

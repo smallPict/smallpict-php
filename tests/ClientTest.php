@@ -402,6 +402,31 @@ class ClientTest extends TestCase
         $this->assertSame('blog/2026', $result->getFolder());
     }
 
+    public function testOptimizeOmitsQualityWhenUnset(): void
+    {
+        $http = $this->recordingHttp(200, ['job_id' => 'job_q', 'status' => 'completed']);
+        $client = new Client('sp_sdk_test', null, $http);
+
+        $client->optimize('raw binary test data', ['mode' => 'extreme']);
+        $client->optimize('raw binary test data', new OptimizeOptions());
+
+        $this->assertArrayNotHasKey('quality', $http->requests[0]['body']['options']);
+        $this->assertArrayNotHasKey('quality', $http->requests[1]['body']['options']);
+        $this->assertNull((new OptimizeOptions())->getQuality());
+    }
+
+    public function testOptimizeSendsQualityWhenSet(): void
+    {
+        $http = $this->recordingHttp(200, ['job_id' => 'job_q', 'status' => 'completed']);
+        $client = new Client('sp_sdk_test', null, $http);
+
+        $client->optimize('raw binary test data', ['mode' => 'extreme', 'quality' => 60]);
+        $client->optimize('raw binary test data', new OptimizeOptions(ImageFormat::AUTO, 150));
+
+        $this->assertSame(60, $http->requests[0]['body']['options']['quality']);
+        $this->assertSame(100, $http->requests[1]['body']['options']['quality']);
+    }
+
     public function testOptimizeOmitsFolderWhenUnset(): void
     {
         $http = $this->recordingHttp(200, ['job_id' => 'job_n', 'status' => 'completed']);

@@ -69,6 +69,13 @@ $result = $client->optimize($imageContent, [
     'mode'   => \SmallPict\Models\CompressionMode::LOSSLESS,
 ]);
 
+// Extreme gives the smallest files on every plan. Leave quality out so the server
+// uses its default for the output format; a quality you set is kept or raised to the
+// format floor. Mode comparison: https://smallpict.app/en/docs/image-settings
+$result = $client->optimize($imageContent, [
+    'mode' => \SmallPict\Models\CompressionMode::EXTREME,
+]);
+
 // Optional upload folder (1-3 segments, e.g. "blog/2026"), sent as options.folder.
 // The server lower-cases it; read it back with $result->getFolder() or getJobStatus()->getFolder().
 // A malformed folder throws ValidationException (server code 400 invalid_folder).
