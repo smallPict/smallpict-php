@@ -60,7 +60,10 @@ $result = $client->optimize(
 echo "Optimized CDN URL: " . $result->getUrl() . "\n";
 echo "Saved: " . $result->getSavingsPercentage() . "% (" . $result->getBytesSaved() . " bytes)\n";
 
-// Compression mode: CompressionMode::LOSSY (default), EXTREME or LOSSLESS.
+// Compression mode: CompressionMode::LOSSY (default), EXTREME, LOSSLESS or AUTO.
+// AUTO picks, per image, the lowest quality that keeps the visual score (SSIMULACRA 2) at or
+// above 70 and ignores quality (WP Pro/Business, Velocity, Momentum, sandbox: 5 per minute).
+// Where it cannot search (PNG or GIF output, animation, time limit) the job is lossy.
 // The server checks it against your plan and answers 403 mode_not_in_plan
 // (PermissionDeniedException, allowed modes in getDetails()['allowed_modes']).
 // The old 'lossless' => true option is deprecated; use 'mode' instead.

@@ -246,6 +246,7 @@ class ClientTest extends TestCase
         return [
             'no mode, no flag' => [[], null, false],
             'mode only' => [['mode' => 'extreme'], 'extreme', false],
+            'mode auto' => [['mode' => 'auto'], 'auto', false],
             'deprecated flag only' => [['lossless' => true], 'lossless', false],
             'flag false is ignored' => [['lossless' => false], null, false],
             'flag agrees with mode' => [['mode' => 'lossless', 'lossless' => true], 'lossless', false],

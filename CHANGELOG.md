@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `CompressionMode::AUTO` (`'auto'`): the server picks the quality per image from a visual score (CMP-07). Plans: WP Pro and Business, Velocity, Momentum and sandbox; a server without auto enabled answers `400 invalid_mode` (`ValidationException`).
 - Compression `mode` option on `optimize()` (FND-07): `OptimizeOptions` constructor argument `$mode` (last position) or array key `mode`, with the values in `SmallPict\Models\CompressionMode` (`LOSSY`, `EXTREME`, `LOSSLESS`). When no mode is set the key is omitted and the server applies `lossy`. An unknown mode throws `ValidationException` before any HTTP call. The server checks the mode against the plan: `403 mode_not_in_plan` raises `PermissionDeniedException` with `getDetails()['mode']` and `getDetails()['allowed_modes']`.
 - `JobStatusResult::getModeApplied()` and `getQualityApplied()`, read from the job status response; `null` for jobs created before modes existed.
 - **Upload folder on `optimize()` (FLD-03).** `OptimizeOptions` constructor argument `$folder` (last position) or array key `folder`, sent as `options.folder` and omitted when unset. The folder the server stored (lower case) comes back in `OptimizeResult::getFolder()` and `JobStatusResult::getFolder()`, `null` without one.

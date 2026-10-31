@@ -13,8 +13,10 @@ final class CompressionMode
     public const LOSSY = 'lossy';
     public const EXTREME = 'extreme';
     public const LOSSLESS = 'lossless';
+    /** The server picks the quality per image from a visual score (CMP-07). */
+    public const AUTO = 'auto';
 
-    public const ALL = [self::LOSSY, self::EXTREME, self::LOSSLESS];
+    public const ALL = [self::LOSSY, self::EXTREME, self::LOSSLESS, self::AUTO];
 
     private function __construct()
     {
