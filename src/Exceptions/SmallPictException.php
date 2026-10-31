@@ -85,6 +85,16 @@ class SmallPictException extends \Exception
         return $this->details;
     }
 
+    /**
+     * Dashboard page where the missing capacity is added (details.upgrade_url), or null.
+     * Show it to the user; the SDK never opens or fetches it.
+     */
+    public function getUpgradeUrl(): ?string
+    {
+        $url = $this->details['upgrade_url'] ?? null;
+        return is_string($url) ? $url : null;
+    }
+
     public function __toString(): string
     {
         $statusStr = $this->statusCode ? " HTTP {$this->statusCode}" : '';

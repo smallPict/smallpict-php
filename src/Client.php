@@ -21,6 +21,7 @@ use SmallPict\Models\OptimizeOptions;
 use SmallPict\Models\OptimizeResult;
 use SmallPict\Models\PurgeResponse;
 use SmallPict\Models\PurgeType;
+use SmallPict\Models\Capacity;
 use SmallPict\Models\QuotaResponse;
 
 class Client
@@ -136,7 +137,8 @@ class Client
             isset($res['cdn_egress_used_bytes']) ? (int)$res['cdn_egress_used_bytes'] : null,
             isset($res['cdn_egress_quota_bytes']) ? (int)$res['cdn_egress_quota_bytes'] : null,
             isset($res['active_keys_count']) ? (int)$res['active_keys_count'] : null,
-            isset($res['active_sites_count']) ? (int)$res['active_sites_count'] : null
+            isset($res['active_sites_count']) ? (int)$res['active_sites_count'] : null,
+            Capacity::fromArray(is_array($res['capacity'] ?? null) ? $res['capacity'] : null)
         );
     }
 
@@ -362,7 +364,8 @@ class Client
                 if ($status >= 500) {
                     throw new ServerException($message, $status, $requestId, $details);
                 }
-                throw new SmallPictException($message, 'INTERNAL_ERROR', $status, $requestId, $details);
+                // Unmapped statuses (e.g. 409 capacity codes) keep the server's code.
+                throw new SmallPictException($message, self::errorCode($body) ?? 'INTERNAL_ERROR', $status, $requestId, $details);
         }
     }
 

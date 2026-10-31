@@ -20,4 +20,15 @@ class PermissionDeniedException extends SmallPictException
     ) {
         parent::__construct($message, 'FORBIDDEN', 403, $requestId, $details, $previous);
     }
+
+    /**
+     * Modes the plan allows, from details.allowed_modes of mode_not_in_plan; otherwise null.
+     *
+     * @return string[]|null
+     */
+    public function getAllowedModes(): ?array
+    {
+        $modes = $this->details['allowed_modes'] ?? null;
+        return is_array($modes) ? array_values(array_filter($modes, 'is_string')) : null;
+    }
 }

@@ -14,6 +14,7 @@ class QuotaResponse
     private ?int $cdnEgressQuotaBytes;
     private ?int $activeKeysCount;
     private ?int $activeSitesCount;
+    private ?Capacity $capacity;
 
     public function __construct(
         string $plan,
@@ -23,7 +24,8 @@ class QuotaResponse
         ?int $cdnEgressUsedBytes = null,
         ?int $cdnEgressQuotaBytes = null,
         ?int $activeKeysCount = null,
-        ?int $activeSitesCount = null
+        ?int $activeSitesCount = null,
+        ?Capacity $capacity = null
     ) {
         $this->plan = $plan;
         $this->bytesUsed = $bytesUsed;
@@ -33,6 +35,7 @@ class QuotaResponse
         $this->cdnEgressQuotaBytes = $cdnEgressQuotaBytes;
         $this->activeKeysCount = $activeKeysCount;
         $this->activeSitesCount = $activeSitesCount;
+        $this->capacity = $capacity;
     }
 
     public function getPlan(): string
@@ -73,5 +76,14 @@ class QuotaResponse
     public function getActiveSitesCount(): ?int
     {
         return $this->activeSitesCount;
+    }
+
+    /**
+     * Read-only capacity of the key's product; null when the server could not read it
+     * or is older and does not send it.
+     */
+    public function getCapacity(): ?Capacity
+    {
+        return $this->capacity;
     }
 }

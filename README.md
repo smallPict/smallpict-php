@@ -167,6 +167,28 @@ echo "CDN cache invalidated successfully.\n";
 $client->purgeCdn([], \SmallPict\Models\PurgeType::FOLDER, 'blog/2026');
 ```
 
+### Capacity and upgrade links
+
+`getQuota()->getCapacity()` returns a `SmallPict\Models\Capacity` for the product of your API key: `getStorage()` (`limit_bytes`, `used_bytes`, `base_bytes`, `addon_blocks`), `getCdn()` (`limit_bytes`, `used_bytes`, `status`), `getBooster()` (`active`, `wp_quota_bytes`, `api_transforms`, `cdn_bytes`, `next_expiry`), `getLapse()` (unpaid-account state), `getPeriodEnd()` and `getManageUrl()`. The groups are arrays with the API's keys. A member that does not apply to your plan is `null`; `getCapacity()` is `null` when the server could not read it or is too old to send it. Capacity is read-only here: storage add-ons and boosters are bought in the dashboard.
+
+```php
+$capacity = $client->getQuota()->getCapacity();
+if ($capacity !== null && $capacity->getStorage() !== null) {
+    $s = $capacity->getStorage();
+    echo "Storage: {$s['used_bytes']} / {$s['limit_bytes']} bytes\n";
+}
+```
+
+Every exception has `getUpgradeUrl()`: the dashboard page where the missing capacity is added (`details.upgrade_url`), or `null`. `storage_quota_exceeded` and `account_read_only` throw `QuotaExceededException`; `mode_not_in_plan` throws `PermissionDeniedException` with `getAllowedModes()`. The SDK never opens these links; show them to your user.
+
+```php
+try {
+    $client->optimize($imageContent);
+} catch (\SmallPict\Exceptions\QuotaExceededException $e) {
+    echo $e->getMessage() . ' Add capacity: ' . ($e->getUpgradeUrl() ?? 'https://smallpict.app/dashboard/billing');
+}
+```
+
 ---
 
 ## 🧪 Testing
